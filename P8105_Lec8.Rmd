@@ -1,0 +1,114 @@
+---
+title: "ggplot1"
+output: github_document
+---
+
+load in a dataset that we will use often.
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors( # download NOAA weather data
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+
+### Scatterplot
+
+1. plot: tmax vs tmin
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point()
+```
+
+
+1) you can save ggplots
+```{r}
+ggp_tmax_tmin = 
+  weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point()
+
+ggp_tmax_tmin
+```
+
+
+2. Addcolor? lines? other stuff??
+ - transparency of points made by this geom_point() #(aes(color = name)) in  geom_point() but not in ggplot() will
+ - se: put confidence interval around the plot 
+        (se = FALSE): exclude standard error bar of confidence interval
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point(aes(color = name), alpha = 0.3) + 
+  geom_smooth(se = FALSE)
+
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE) + #draw best fit line and exclude standard error bar of confidence interval
+  facet_grid(. ~ name)
+```
+
+
+Make more scatterplots
+```{r}
+weather_df %>% 
+  ggplot(aes(x = date, y = tmax, size = prcp)) +
+  geom_point(alpha = .3) +
+  facet_grid(. ~ name) +
+  geom_smooth(se = FALSE)
+```
+
+
+### Use data manipulation as a part of this
+```{r}
+weather_df %>% 
+  filter(name == "CentralPark_NY") %>% 
+  mutate(
+    tmax = tmax * (9/5) + 32,
+    tmin = tmin * (9/5) + 32
+  ) %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point()
+```
+
+
+### Stacking geoms
+
+which geoms do you want?
+
+1. Draw smooth curve without scatterpoints 
+```{r}
+weather_df %>% 
+  ggplot(aes(x = date, y = tmax, color = name)) +
+  geom_smooth()
+```
+
+
+2. geom_hex(): give density of data
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmax, y = tmin)) + 
+  geom_hex()
+```
+
+
+
