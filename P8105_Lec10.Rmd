@@ -1,0 +1,246 @@
+---
+title: "Group by and summarize"
+output: github_document
+---
+
+```{r message = FALSE}
+library(tidyverse)
+
+#set the figures' size
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+#set the theme of all graphs
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+#set color of all graphs
+options(
+  ggplot2.continuous.colour = "viridis", #color 边界
+  ggplot2.continuous.fill = "viridis" #color 填充
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+Load the weather dataset
+```{r}
+weather_df =  
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode( #add a new variable named `name` and match with the `id`
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10,
+    month = lubridate::floor_date(date, unit = "month")) %>% #Add a new variable to describe the "month" variable rounding the date to the nearest month.
+  select(name, id, everything())
+```
+
+### `group_by()`
+```{r}
+weather_df %>% 
+  group_by(name, month) %>% #group name and month
+  ungroup(month) #ungroup month
+```
+
+### Counting things
+ - How many observations in ...? 
+ 
+1. `group_by` first, them `summaarize()`
+```{r}
+#Count month observations:
+weather_df %>% 
+  group_by(month) %>% #group by month
+  summarize(n_obs = n()) #`n()`: how many observations in current group!
+
+weather_df %>% 
+  group_by(name, month) %>% #group by name and month
+  summarize(n_obs = n()) # how many observations in current group!
+```
+OR:
+
+2. `count()`
+```{r}
+weather_df %>% 
+  count(name, month, name = "n_obs") #count the name and month (similar as groupby and summarize)
+```
+
+
+### Creating 2x2 tables:
+1. 
+ - Summarize produces is a data frame, so we can make plots.
+ - **Never** use base R's `table` function, since it produces data frame that cannot do anything on.
+```{r}
+#never use!
+weather_df %>% 
+  pull(name) %>% 
+  table()
+```
+
+2. creating 2x2 tables (2ways): (a) and (b) produce the same things! 
+```{r}
+#a)
+weather_df %>% 
+  janitor::tabyl(month, name)
+
+#b)
+weather_df %>% 
+  group_by(name, month) %>% #group by name
+  summarize(n_obs = n()) # how many observations in each name and month
+
+weather_df %>% 
+  group_by(month) %>% 
+  summarize(
+    n_obs = n(),
+    n_days = n_distinct(date)) #show number of distinct values of date in each month.
+```
+
+3. 
+```{r}
+weather_df %>% 
+  filter(name != "Waikiki_HA") %>% 
+  mutate(
+    cold = case_when( #IF, THEN function!
+      tmax < 5 ~ "cold", # if tmax < 5, then "cold" variable will print "cold"
+      tmax >=5 ~ "not_cold",  # if tmax >= 5, then "cold" variable will print "not_cold"
+      TRUE      ~ "" #otherwise, ...?
+    )
+  ) %>% 
+  group_by(name,cold) %>% 
+  summarize(count = n())
+
+#OR
+
+weather_df %>% 
+  filter(name != "Waikiki_HA") %>% 
+  mutate(
+    cold = case_when( #IF, THEN function!
+      tmax < 5 ~ "cold", # if tmax < 5, then "cold" variable will print "cold"
+      tmax >=5 ~ "not_cold",  # if tmax >= 5, then "cold" variable will print "not_cold"
+      TRUE      ~ "" #otherwise, ...?
+    )
+  ) %>% 
+  janitor::tabyl(name, cold)
+```
+
+4. Formatting table outputs
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  summarize(
+    n_obs = n(),
+    mean_tmax = mean(tmax, na.rm = TRUE) #only show the summarized variables
+  ) %>% 
+  knitr::kable(digits = 2) #make table with 2 sigfits
+```
+
+### General summaries
+1. use the produced dataframe to plot ggplot
+```{r}
+weather_df %>% 
+  group_by(name, month) %>% 
+  summarize(
+    n_obs = n(),
+    mean_tmax = mean(tmax, na.rm = TRUE), #drop missing values in tmax variables,
+    median_tmax = median(tmax, na.rm = TRUE),
+    sd_tmax = sd(tmax, na.rm = TRUE)
+  ) %>% 
+  ggplot(aes(x = month, y = mean_tmax, color = name)) + 
+  geom_point() + 
+  geom_line()
+```
+
+2. Summarize many columns:
+```{r}
+weather_df %>% 
+  group_by(name, month) %>% 
+  summarize(across(prcp:tmin, mean)) #mean of variables from prcp to tmin (use across to summarize many columns by using same function)
+```
+
+3. Make results easier to read:
+```{r}
+weather_df %>% 
+  group_by(name, month) %>% 
+  summarize(mean_tmax = mean(tmax)) %>% 
+  pivot_wider(
+    names_from = name,
+    values_from = mean_tmax
+  ) %>% 
+  knitr::kable(digits = 1) #1 sigfit
+```
+
+### `group_by` and `mutated`
+ - for example: so we can calculate the mean based on the group (calculate the mean for one group first, and so on)
+1. 
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  mutate(
+    mean_tmax = mean(tmax, na.rm = TRUE), #adding a variable for mean_tmax
+    centered_tmax = tmax - mean_tmax
+  ) %>% 
+  ggplot(aes(x = date, y = centered_tmax, color = name)) +
+  geom_point()
+```
+
+2. ranking function
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  mutate(
+    tmax_rank = min_rank(desc(tmax)) #rank tmax largest to lowest; no desc() then from lowest to largest
+  ) %>% 
+  filter(tmax_rank == 1) #filter the hottest day
+```
+
+3. Lagged function
+
+ - "compute day to day temperature variability"
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  mutate(
+    lagged_tmax = lag(tmax, n = 1), #show what is the tmax 1 day before (since n = 1), so the table shows the tmax for today and the day before
+    tmax_diff = tmax - lagged_tmax
+  ) %>% 
+  summarize(
+    diff_sd = sd(tmax_diff, na.rm = TRUE),
+    diff_max = max(tmax_diff, na.rm = TRUE) )
+```
+
+### Limitations
+what if my "summary" is a linear model...
+Unable to do it. 
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  summarize(cor_tmin_tmax = cor(tmin, tmax, use = "complete")) #calculate the correlation btw tmax and tmin
+
+
+weather_df %>% 
+  filter(name == "CentralPark_NY") %>% 
+  lm(tmax ~ tmin, data = .) #make a linear equation by tmax and tmin, by using this dataset, weather_df
+
+#unable to do 
+# weather_df %>% 
+  # group_by(name) %>% 
+  # summarize(lm = lm(tmax ~ tmin))
+```
+
+
+
+
+
+
+
+
