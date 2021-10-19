@@ -1,0 +1,215 @@
+---
+title: "visualization_ggplot2"
+output: github_document
+---
+
+load in a dataset that we will use often.
+
+```{r message = FALSE}
+library(tidyverse)
+# library(ggridges)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = 0.6,
+  out.width = "90%"
+)
+```
+
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(             #download NOAA weather data, pull data names c, var, and date
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+
+### Scatterplot:
+
+1. scatterplot: tmax vs tmin
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point()
+
+# or
+
+ggplot(weather_df, aes(x = tmin, y = tmax)) +
+  geom_point()
+```
+
+
+1) save the ggplots and can print later
+```{r}
+ggp_tmax_tmin = 
+  weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point()
+
+ggp_tmax_tmin
+
+#or
+
+ggp_tmax_tmin = 
+  weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax))
+
+ggp_tmax_tmin +  geom_point()
+```
+
+
+2. Add color/ smooth curves/ other stuff
+ - se: put confidence interval around the plot 
+        (se = FALSE): exclude standard error bar of confidence interval
+ - alpha = .3: transparency of color of the points
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) + #color all ggplots based on names 
+  geom_point(alpha = 0.3) + 
+  geom_smooth(se = FALSE) + #draw the smooth curves in the middle of dataset, and exclude standard error bar of confidence interval
+  facet_grid(. ~ name) #multi-panel graphs: separate the plot based on variable `name`
+
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point(aes(color = name), alpha = 0.3) +  #only color the scatterplot based on names 
+  geom_smooth(se = FALSE) #since only color the scatterplot, only show one smooth curve based on entire data
+```
+
+
+1) Make more scatterplots
+```{r}
+weather_df %>% 
+  ggplot(aes(x = date, y = tmax, color = name, size = prcp)) + #let the size of plots based on prcp's value (larger prcp value, larger point)
+  geom_point(alpha = .3) +
+  facet_grid(. ~ name) +
+  geom_smooth(se = FALSE, size = 0.8)
+```
+
+
+### Use data manipulation as a part of this
+```{r}
+weather_df %>% 
+  filter(name == "CentralPark_NY") %>% 
+  mutate(
+    tmax = tmax * (9/5) + 32,
+    tmin = tmin * (9/5) + 32
+  ) %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point()
+```
+
+
+### Stacking geoms
+
+which geoms do you want?
+
+1. Draw smooth curve without scatterplot
+```{r}
+weather_df %>% 
+  ggplot(aes(x = date, y = tmax, color = name)) +
+  geom_smooth()
+```
+
+
+2. give density of data (neat geom!)
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmax, y = tmin)) + 
+  geom_hex()
+
+weather_df %>% 
+  ggplot(aes(x = tmax, y = tmin)) + 
+  geom_density2d() +
+  geom_point(alpha = .3)
+
+    
+```
+
+
+### Univariate plots
+
+# Everything before ggplot use pipe, %>%; Everything after ggplot use plus, +.
+
+1. Histogram
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmax, fill = name)) + # fill = name, fill the color of histogram bars based on diff names.
+  geom_histogram() +
+  facet_grid(. ~ name) # separate one plot to separate plots based on names (.~ nmaes: 1 rows, multiple columns)
+
+```
+
+2. Density plot: smoothed down the histogram (easier to compare, but loose some data)
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmax, fill = name)) +
+  geom_density(alpha = .3) #color's transparency of density plots is 0.3
+```
+
+3. Boxplot
+```{r}
+weather_df %>% 
+  ggplot(aes(y = tmax)) + #one boxplots of tmax values
+  geom_boxplot()
+
+
+weather_df %>% 
+  ggplot(aes(x = name, y = tmax, fill = name)) + #draw multiple boxplots based on names
+  geom_boxplot(alpha = 0.3)
+```
+
+4. Trendy plot: violin plots :-)
+```{r}
+weather_df %>% 
+  ggplot(aes(x = name, y = tmax, fill = name)) +
+  geom_violin(alpha = 0.3) +
+  stat_summary(fun = "median") #give the point of median
+```
+
+5. Ridge plots
+```{r}
+library(ggridges)
+
+weather_df %>% 
+  ggplot(aes(x = tmax, y = name)) +
+  geom_density_ridges(alpha = .8, scale = .8) #multiple density curves based on different names
+```
+
+* color = name vs. fill = name:    
+ color = name: color the outline    
+ fill = name: fill the color in the graph   
+
+### Save and Embed plots
+
+1. Save a scatterplot
+```{r}
+weather_plot = 
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) + #aes(color = name), since it is aesthetic change.
+  geom_point(alpha = .3)
+
+ggsave("weather_plot.pdf", weather_plot, width = 8, height = 5) #save the plot `weather_plot` as the name "weather_plot.pdf", with specific size
+```
+2. Embedding
+```{r, fig.width = 12, fig.height = 7}
+#make the figure 12x7
+
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = .3)
+```
+
+
+
