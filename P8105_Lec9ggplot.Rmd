@@ -1,0 +1,356 @@
+---
+title: "visualization_ggplot2"
+subtitle: "Part_II"
+output: github_document
+---
+
+```{r message = FALSE}
+library(tidyverse)
+#library(ggridges)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = 0.6,
+  out.width = "90%"
+)
+```
+
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors( # download NOAA weather data
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+
+### Labels of ggplot
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.5) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations, temperatures in 2017." #说明
+  )
+
+```
+
+
+### Scales
+1. data scales
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations"
+  ) +
+  scale_x_continuous(         #scale_x_continuous (since x is continuous variable)
+    breaks = c(-15, 0, 15),   #scale the x variables into 3 breaks    
+    labels = c("-15C", "0", "15C") #label the scales of x
+  )  +
+  scale_y_continuous(
+    trans = "sqrt",         #transformation the y data to square root
+    position = "right"      #change the scale to the right of plot
+  )
+```
+
+
+2. color scales
+```{r}
+library(viridis) #for viridis
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations"
+  ) +
+   scale_color_hue(
+     name = "Location", #change the name of caption on the rightside
+     h = c(100, 300)) #手动设色系
+  
+  
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations"
+  ) +
+   viridis::scale_color_viridis(
+     name = "Location", #change the name of caption on the rightside
+     discrete = TRUE
+   )
+```
+
+### Themes
+1. shift the legend
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations"
+  ) +
+  scale_color_viridis_d() +
+  theme(legend.position = "bottom") #change the legend to the bottom
+#change position should be the last step
+```
+
+2. Change the overall theme
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations"
+  ) +
+  scale_color_viridis_d() +
+  theme_bw()   #black outline, white background
+
+#Prefer 这个！
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Temperature at three stations",
+    x = "Minimum daily temp (C)",
+    y = "Maximum daily temp (C)",
+    caption = "Data from the rnoaa package with three stations"
+  ) +
+  scale_color_viridis_d() +
+  theme_minimal() #get rid of the black outline of graph
+```
+
+
+# copy-and-pasted to the beginning of every rMarkdown document:
+**code for setting options of graphs that will use**
+```{r eval=FALSE}
+library(tidyverse)
+
+#set the figures' size
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+#set the theme of all graphs
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+#set color of all graphs
+options(
+  ggplot2.continuous.colour = "viridis", #color 边界
+  ggplot2.continuous.fill = "viridis" #color 填充
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+
+### combind two different datasets: two whole datasets are in different graph types
+ - `data` args in `geom`
+
+```{r}
+central_park = 
+  weather_df %>% 
+  filter(name == "CentralPark_NY")
+
+waikiki = 
+  weather_df %>% 
+  filter(name == "Waikiki_HA")
+
+waikiki %>% 
+ggplot(aes(x = date, y = tmax, color = name)) + 
+  geom_point() + 
+  geom_line(data = central_park)
+
+#or: 
+
+ggplot(data = waikiki, aes(x = date, y = tmax, color = name)) + 
+  geom_point() + 
+  geom_line(data = central_park)
+```
+
+### Put up different types plots side by side:
+ - `patchwork`
+```{r}
+library(patchwork)
+
+#three plots
+ggp_tmax_tmin = 
+  weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = 0.5) +
+  theme(legend.position = "none") #delete legend
+
+ggp_prcp_dens = 
+  weather_df %>% 
+  filter(prcp > 0) %>% 
+  ggplot(aes(x = prcp, fill = name)) + 
+  geom_density(alpha = 0.5)
+
+ggp_tmax_date = 
+  weather_df %>% 
+  ggplot(aes(x = date, y = tmax, color = name)) + 
+  geom_point(alpha = .5) +
+  geom_smooth()
+
+#combine
+(ggp_tmax_tmin + ggp_prcp_dens + ggp_tmax_date) # combining different ggplots on the same row
+(ggp_tmax_tmin + ggp_prcp_dens) / ggp_tmax_date # two plots on the top, one on the bottom
+  
+```
+
+
+### data manipulation
+1. reorder the graph should reorder the data:
+```{r}
+#plot by the x = name with ascending tmax:
+
+##Should reorder the dataset first, but not change in ggplot
+
+weather_df %>% 
+  mutate(
+    name = factor(name), #change the name from character to factor
+    name = forcats::fct_relevel(name, c("Waikiki_HA")) #reorder the name, let "wakiki" be first
+  ) %>% 
+  ggplot(aes(x = name, y = tmax, fill = name)) +  
+  geom_boxplot(alpha = .5)
+
+
+weather_df %>% 
+  mutate(
+    name = fct_reorder(name, tmax)  #change the name from character to factor, Also reorder the name by ascending tmax.
+  ) %>% 
+  ggplot(aes(x = name, y = tmax, fill = name)) +  
+  geom_boxplot(alpha = .5)
+```
+
+2.Want two variables in a graph
+ - what if I want densities for tmax and tmin simultaneously?
+```{r}
+weather_df %>% 
+  pivot_longer(
+    tmax:tmin,
+    names_to = "observations",
+    values_to = "temperatures"
+  ) %>% 
+  ggplot(aes(x = temperatures, fill = observations)) + 
+  geom_density(alpha = 0.3) +
+  facet_grid(. ~ name)
+```
+
+
+### Revisit the pups
+ - combine data manipulations and ggplot 
+ 
+1. Example1: 
+```{r}
+pup_data = 
+  read_csv("./data/FAS_pups.csv") %>% 
+  janitor::clean_names() %>% 
+  mutate(sex = recode(sex, `1` = "male", `2` = "female"))
+
+litters_data = 
+  read_csv("./data/FAS_litters.csv") %>% 
+  janitor::clean_names() %>% 
+  separate(group, into = c("dose", "day_of_tx"), sep = 3)
+
+#left join:
+fax_data = left_join(pup_data, litters_data, by = "litter_number")
+
+
+#Draw graphs between two variables in this huge datasets
+fax_data %>% 
+  ggplot(aes(x = dose, y = pd_ears)) +
+  geom_violin() +
+  facet_grid(.~ day_of_tx)
+
+
+#What if I am interested in the relationship between two variables from 4 types (which are begining with "pd_")
+##combine the 4 variables first
+fax_data %>% 
+  select(dose, day_of_tx, starts_with("pd_")) %>%  #select the data I am interested in: the values of two variables that are cooresponding to 4 types
+  pivot_longer(      #reorganized the data that I am interested in into two variables
+    pd_ears:pd_walk,
+    names_to = "outcome",
+    values_to = "pn_day"
+  ) %>% 
+  drop_na() %>% #drop missing values
+  mutate(outcome = forcats::fct_relevel(outcome, "pd_ears","pd_pivot","pd_walk","pd_eyes")) %>% 
+  ggplot(aes(x = dose, y = pn_day)) +
+  geom_violin() +
+  facet_grid(day_of_tx ~ outcome)
+
+```
+
+2. Example2:
+
+```{r}
+pulse_df = 
+  haven::read_sas("./data/public_pulse_data.sas7bdat") %>% 
+  janitor::clean_names() %>% 
+  pivot_longer(
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit", 
+    names_prefix = "bdi_score_",
+    values_to = "bdi") %>%
+  mutate(visit = recode(visit, "bl" = "00m"))
+
+pulse_df %>% 
+  ggplot(aes(x = visit, y = bdi)) +
+  geom_boxplot()
+
+pulse_df %>% 
+  ggplot(aes(x = visit, y = bdi)) +
+  geom_point() +
+  geom_line(aes(group = id)) #good for longitude data analysis. # one person observe for a period of time
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
